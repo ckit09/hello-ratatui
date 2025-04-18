@@ -12,6 +12,26 @@ use ratatui::{
 };
 use std::time::{Duration, Instant};
 
+// Configuration for each coin
+#[derive(Debug, Clone)]
+struct CoinConfig {
+    symbol: String,
+    display_name: String,
+    color: Color,
+    precision: usize,
+}
+
+impl Default for CoinConfig {
+    fn default() -> Self {
+        Self {
+            symbol: String::new(),
+            display_name: String::new(),
+            color: Color::White,
+            precision: 2,
+        }
+    }
+}
+
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     let terminal = ratatui::init();
@@ -25,24 +45,82 @@ fn main() -> color_eyre::Result<()> {
 pub struct App {
     /// Is the application running?
     running: bool,
-    prices: Prices,
+    prices: Vec<f64>,
+    coin_configs: Vec<CoinConfig>,
     last_update: Instant,
-}
-
-#[derive(Debug, Default)]
-struct Prices {
-    btc: f64,
-    ton: f64,
-    aave: f64,
-    xrp: f64,
 }
 
 impl App {
     /// Construct a new instance of [`App`].
     pub fn new() -> Self {
+        // Define your coin configurations here
+        let coin_configs = vec![
+            CoinConfig {
+                symbol: "BTCUSDT".to_string(),
+                display_name: "BTC/USDT".to_string(),
+                color: Color::Green,
+                precision: 2,
+            },
+            CoinConfig {
+                symbol: "ETHUSDT".to_string(),
+                display_name: "ETH/USDT".to_string(),
+                color: Color::Blue,
+                precision: 2,
+            },
+            CoinConfig {
+                symbol: "BNBUSDT".to_string(),
+                display_name: "BNB/USDT".to_string(),
+                color: Color::Yellow,
+                precision: 2,
+            },
+            CoinConfig {
+                symbol: "UNIUSDT".to_string(),
+                display_name: "UNI/USDT".to_string(),
+                color: Color::Cyan,
+                precision: 2,
+            },
+            CoinConfig {
+                symbol: "TONUSDT".to_string(),
+                display_name: "TON/USDT".to_string(),
+                color: Color::Cyan,
+                precision: 2,
+            },
+            CoinConfig {
+                symbol: "SOLUSDT".to_string(),
+                display_name: "SOL/USDT".to_string(),
+                color: Color::Cyan,
+                precision: 2,
+            },
+            CoinConfig {
+                symbol: "XRPUSDT".to_string(),
+                display_name: "XRP/USDT".to_string(),
+                color: Color::Magenta,
+                precision: 4,
+            },
+            CoinConfig {
+                symbol: "DOGEUSDT".to_string(),
+                display_name: "DOGE/USDT".to_string(),
+                color: Color::LightYellow,
+                precision: 6,
+            },
+            CoinConfig {
+                symbol: "TONUSDT".to_string(),
+                display_name: "TON/USDT".to_string(),
+                color: Color::LightBlue,
+                precision: 4,
+            },
+            CoinConfig {
+                symbol: "ADAUSDT".to_string(),
+                display_name: "ADA/USDT".to_string(),
+                color: Color::LightCyan,
+                precision: 4,
+            },
+        ];
+
         Self {
             running: false,
-            prices: Prices::default(),
+            prices: vec![0.0; coin_configs.len()],
+            coin_configs,
             last_update: Instant::now(),
         }
     }
@@ -78,7 +156,7 @@ impl App {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(3),  // Title
-                Constraint::Length(10), // Prices
+                Constraint::Length((self.coin_configs.len() as u16) * 2 + 2), // Prices
             ])
             .split(frame.area());
 
@@ -95,36 +173,15 @@ impl App {
         );
 
         // Prices
-        let prices_text = vec![
+        let prices_text: Vec<Line> = self.coin_configs.iter().enumerate().map(|(i, config)| {
             Line::from(vec![
-                Span::raw("BTC/USDT:  "),
+                Span::raw(format!("{}:  ", config.display_name)),
                 Span::styled(
-                    format!("${:.2}", self.prices.btc),
-                    Style::default().fg(Color::Green),
+                    format!("${:.prec$}", self.prices[i], prec = config.precision),
+                    Style::default().fg(config.color),
                 ),
-            ]),
-            Line::from(vec![
-                Span::raw("TON/USDT:  "),
-                Span::styled(
-                    format!("${:.4}", self.prices.ton),
-                    Style::default().fg(Color::Yellow),
-                ),
-            ]),
-            Line::from(vec![
-                Span::raw("AAVE/USDT: "),
-                Span::styled(
-                    format!("${:.2}", self.prices.aave),
-                    Style::default().fg(Color::Cyan),
-                ),
-            ]),
-            Line::from(vec![
-                Span::raw("XRP/USDT:  "),
-                Span::styled(
-                    format!("${:.4}", self.prices.xrp),
-                    Style::default().fg(Color::Magenta),
-                ),
-            ]),
-        ];
+            ])
+        }).collect();
 
         frame.render_widget(
             Paragraph::new(prices_text)
@@ -168,17 +225,10 @@ impl App {
         let market = Market::new(None, None);
         
         // Get prices for each symbol
-        if let Ok(btc_price) = market.get_price("BTCUSDT") {
-            self.prices.btc = btc_price.price;
-        }
-        if let Ok(ton_price) = market.get_price("TONUSDT") {
-            self.prices.ton = ton_price.price;
-        }
-        if let Ok(aave_price) = market.get_price("AAVEUSDT") {
-            self.prices.aave = aave_price.price;
-        }
-        if let Ok(xrp_price) = market.get_price("XRPUSDT") {
-            self.prices.xrp = xrp_price.price;
+        for (i, config) in self.coin_configs.iter().enumerate() {
+            if let Ok(price) = market.get_price(&config.symbol) {
+                self.prices[i] = price.price;
+            }
         }
         
         Ok(())
